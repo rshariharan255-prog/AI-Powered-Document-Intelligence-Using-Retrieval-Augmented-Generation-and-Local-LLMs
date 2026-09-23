@@ -59,9 +59,13 @@ class LLMService:
             "model": self.model,
             "prompt": prompt,
             "stream": False,
+            "keep_alive": "60m",  # Keep model warm in RAM to avoid reload latency
             "options": {
                 "temperature": 0.1,  # Low temperature for grounded and consistent RAG responses
-                "top_p": 0.9
+                "top_p": 0.9,
+                "num_predict": 160,  # Cap generation tokens for faster responses
+                "num_ctx": 1024,     # Limit context window for 4x faster CPU prompt evaluation
+                "num_thread": 6      # Multi-core CPU utilization
             }
         }
         if system_prompt:

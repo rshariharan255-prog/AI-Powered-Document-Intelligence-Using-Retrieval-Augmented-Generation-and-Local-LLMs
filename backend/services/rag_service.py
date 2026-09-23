@@ -13,16 +13,32 @@ SYSTEM_PROMPT = """You are a knowledgeable and precise AI Document Assistant.
 Your job is to answer the user's question using the provided DOCUMENT CONTEXT.
 
 Guidelines:
-1. Thoroughly explain the topics, concepts, titles, and bullet points found in the DOCUMENT CONTEXT.
-2. If the user asks what the presentation or document is about, summarize the project title, problem statement, objectives, and methodologies described in the context.
-3. Organize your answer clearly using bullet points and concise paragraphs.
-4. Base all facts strictly on the text in the DOCUMENT CONTEXT.
+1. Thoroughly explain the topics, concepts, titles, team members, authors, and bullet points found in the DOCUMENT CONTEXT.
+2. If the user asks about the team members, authors, presenter, or guide, extract their names from the title/introductory slides or document text.
+3. If the user asks what the presentation or document is about, or what progress/work was done till now, summarize the project title, problem statement, objectives, completed milestones, and methodologies described in the context.
+4. If a specific numeric percentage or individual task breakdown is not explicitly stated in the document, explain the collective progress and completed phases clearly.
+5. Organize your answer cleanly using bullet points and concise paragraphs.
+6. Base all facts strictly on the text in the DOCUMENT CONTEXT.
 """
+
+TEAM_PATTERNS = [
+    "team", "member", "members", "author", "authors", "who did", "who made",
+    "who worked", "who presented", "presenter", "presenters", "guide", "supervisor",
+    "student", "students", "faculty", "contributors", "contributor", "who are", "who is",
+    "who prepared", "who developed"
+]
 
 OVERVIEW_PATTERNS = [
     "about", "summary", "summarize", "overview", "what is this", "what is the ppt",
     "the ppt is about", "the document is about", "main point", "topic", "purpose",
-    "describe", "explain the ppt", "explain the document", "presentation", "freshpulse"
+    "describe", "explain the ppt", "explain the document", "presentation", "freshpulse",
+    "project about", "what is the project", "introduction", "objective", "objectives", "aim"
+]
+
+PROGRESS_PATTERNS = [
+    "progress", "rate", "done", "status", "complete", "completed", "work done", "done till now",
+    "done so far", "what was done", "what did", "milestone", "milestones", "roadmap",
+    "phase", "review", "accomplished", "activities"
 ]
 
 class RAGService:
@@ -30,18 +46,23 @@ class RAGService:
         self.similarity_threshold = settings.SIMILARITY_THRESHOLD
         self.top_k = settings.TOP_K
 
-    def _is_overview_query(self, query: str) -> bool:
-        """Check if the user query is asking for a general document summary or overview."""
+    def _detect_query_intent(self, query: str) -> Dict[str, bool]:
+        """Detect if the query relates to overview, team members, or progress/status."""
         q_clean = query.lower().strip()
-        if len(q_clean.split()) <= 6 and any(p in q_clean for p in OVERVIEW_PATTERNS):
-            return True
-        return any(phrase in q_clean for phrase in [
-            "the ppt is about", "what is the ppt about", "what is this about",
-            "what is this document about", "summarize", "give an overview"
-        ])
+        words = set(re.findall(r'\b\w+\b', q_clean))
+        
+        is_team = any(tp in q_clean or tp in words for tp in TEAM_PATTERNS)
+        is_overview = any(op in q_clean for op in OVERVIEW_PATTERNS) or len(words) <= 4
+        is_progress = any(pp in q_clean or pp in words for pp in PROGRESS_PATTERNS)
+        
+        return {
+            "is_team": is_team,
+            "is_overview": is_overview,
+            "is_progress": is_progress
+        }
 
     def _normalize_question_for_llm(self, question: str) -> str:
-        """If user inputs a short fragment like 'THE PPT IS ABOUT', expand it for clear LLM synthesis."""
+        """If user inputs a short fragment, expand it for clear LLM synthesis."""
         q_clean = question.lower().strip()
         if q_clean in ["the ppt is about", "the ppt is about?", "ppt is about", "about", "what is the ppt about", "what is this about"]:
             return "Based on the provided presentation slides, explain what this project and presentation is about, including the title, problem statement, and key objectives."
@@ -100,7 +121,7 @@ class RAGService:
         """
         Execute the complete RAG Query Pipeline:
         1. Embed user query using all-MiniLM-L6-v2
-        2. Perform FAISS Top-K similarity search (and overview chunk inclusion if applicable)
+        2. Perform FAISS Top-K similarity search (and intent-based chunk inclusion)
         3. Check relevance against similarity threshold
         4. Construct secure context prompt
         5. Invoke Gemma 2B via Ollama
@@ -134,29 +155,43 @@ class RAGService:
         search_time = time.time() - search_start
 
         top_score = retrieved_chunks[0]["score"] if retrieved_chunks else 0.0
-        is_overview = self._is_overview_query(question)
+        intent = self._detect_query_intent(question)
+        is_intent_matched = intent["is_team"] or intent["is_overview"] or intent["is_progress"]
 
-        # If it's an overview question and a document is loaded, gather the key slides
-        if is_overview and document_id:
-            intro_chunks = [
-                {
-                    "chunk_id": m.get("chunk_id"),
-                    "document_id": m.get("document_id"),
-                    "filename": m.get("filename"),
-                    "page": m.get("page_number"),
-                    "text": m.get("text"),
-                    "score": 0.95
-                }
-                for m in vector_store.metadata
-                if m.get("document_id") == document_id and m.get("page_number") in [1, 2, 3, 4, 5]
-            ]
+        # If document is loaded and intent matches overview/team/progress, inject key slides
+        if document_id and is_intent_matched:
+            target_pages = set()
+            if intent["is_team"]:
+                target_pages.add(1)
+            if intent["is_overview"]:
+                target_pages.update([1, 2, 3, 4])
+            if intent["is_progress"]:
+                target_pages.update([1, 4, 12, 16])
+
+            # Select one primary chunk per key page
+            injected_chunks = []
+            seen_pages = set()
+            for m in vector_store.metadata:
+                if m.get("document_id") == document_id:
+                    p = m.get("page_number")
+                    if p in target_pages and p not in seen_pages:
+                        seen_pages.add(p)
+                        injected_chunks.append({
+                            "chunk_id": m.get("chunk_id"),
+                            "document_id": m.get("document_id"),
+                            "filename": m.get("filename"),
+                            "page": p,
+                            "text": m.get("text"),
+                            "score": 0.95
+                        })
+
             seen_ids = set()
             merged_chunks = []
-            for c in intro_chunks + retrieved_chunks:
+            for c in injected_chunks + retrieved_chunks:
                 if c["chunk_id"] not in seen_ids:
                     seen_ids.add(c["chunk_id"])
                     merged_chunks.append(c)
-            retrieved_chunks = merged_chunks[:self.top_k]
+            retrieved_chunks = merged_chunks[:4]
             is_relevant = True
         else:
             is_relevant = len(retrieved_chunks) > 0 and (
@@ -165,7 +200,7 @@ class RAGService:
 
         logger.info(
             f"Retrieved {len(retrieved_chunks)} chunks (Top score: {top_score:.3f}, "
-            f"Overview: {is_overview}). Relevant: {is_relevant}"
+            f"Intent: {intent}). Relevant: {is_relevant}"
         )
 
         # Prepare debug info
