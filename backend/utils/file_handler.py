@@ -8,6 +8,8 @@ from config import settings
 # Maximum allowed file size (25 MB)
 MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024
 
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff"}
+
 class FileHandler:
     @staticmethod
     def generate_document_id() -> str:
@@ -26,15 +28,15 @@ class FileHandler:
     @staticmethod
     def validate_document_file(file: UploadFile, content: bytes) -> None:
         """
-        Validate file extension and size for PDF and PowerPoint (.pptx) documents.
+        Validate file extension and size for PDF, PowerPoint (.pptx), and Image documents.
         """
         filename_lower = file.filename.lower()
-        valid_extensions = (".pdf", ".pptx", ".ppt")
+        valid_extensions = (".pdf", ".pptx", ".ppt", ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff")
         
         if not any(filename_lower.endswith(ext) for ext in valid_extensions):
             raise HTTPException(
                 status_code=400,
-                detail="Invalid file type. Please upload a PDF (.pdf) or PowerPoint (.pptx) document."
+                detail="Invalid file type. Please upload a PDF (.pdf), PowerPoint (.pptx), or Image (.png, .jpg, .jpeg, .webp) document."
             )
 
         if len(content) == 0:

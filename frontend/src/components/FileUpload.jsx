@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { UploadCloud, FileText, CheckCircle2, AlertCircle, Loader2, Image, Sparkles } from 'lucide-react';
 import { uploadPDF } from '../services/api';
+
+const ALLOWED_EXTENSIONS = ['.pdf', '.pptx', '.ppt', '.png', '.jpg', '.jpeg', '.webp', '.bmp', '.tiff'];
 
 export default function FileUpload({ onUploadSuccess }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -24,10 +26,10 @@ export default function FileUpload({ onUploadSuccess }) {
     if (!selectedFile) return;
 
     const nameLower = selectedFile.name.toLowerCase();
-    const isValidExt = nameLower.endsWith('.pdf') || nameLower.endsWith('.pptx') || nameLower.endsWith('.ppt');
+    const isValidExt = ALLOWED_EXTENSIONS.some(ext => nameLower.endsWith(ext));
 
     if (!isValidExt) {
-      setUploadError('Please upload a PDF (.pdf) or PowerPoint (.pptx) file.');
+      setUploadError('Please upload a PDF (.pdf), PowerPoint (.pptx), or Image (.png, .jpg, .jpeg, .webp) file.');
       setFile(null);
       return;
     }
@@ -72,7 +74,7 @@ export default function FileUpload({ onUploadSuccess }) {
       }
     } catch (err) {
       console.error(err);
-      setUploadError(err.response?.data?.detail || err.message || 'Failed to upload and process PDF');
+      setUploadError(err.response?.data?.detail || err.message || 'Failed to upload and process document');
     } finally {
       setIsUploading(false);
     }
@@ -80,11 +82,17 @@ export default function FileUpload({ onUploadSuccess }) {
 
   return (
     <div className="card">
-      <h2 className="card-title">
-        <UploadCloud size={22} color="#6366f1" /> Upload PDF Document
-      </h2>
-      <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-        Upload a text-based PDF document. Text will be extracted page-by-page preserving accurate page numbers.
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+        <h2 className="card-title" style={{ margin: 0 }}>
+          <UploadCloud size={22} color="#6366f1" /> Upload Document or Image
+        </h2>
+        <span className="pro-badge">
+          <Sparkles size={11} /> RapidOCR Enabled
+        </span>
+      </div>
+
+      <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', marginBottom: '1rem' }}>
+        Supports PDF, PPTX, and Image files (.png, .jpg, .jpeg, .webp). OCR automatically extracts visual text from scanned pages & diagrams.
       </p>
 
       {/* Drag & Drop Zone */}
@@ -99,20 +107,20 @@ export default function FileUpload({ onUploadSuccess }) {
           type="file"
           ref={fileInputRef}
           onChange={handleFileChange}
-          accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation,.pptx,.ppt"
+          accept="application/pdf,.pdf,.pptx,.ppt,.png,.jpg,.jpeg,.webp,.bmp,.tiff"
           style={{ display: 'none' }}
         />
 
         <div className="dropzone-content">
           <div className="dropzone-icon">
-            <UploadCloud size={36} color="#818cf8" />
+            <UploadCloud size={32} color="#818cf8" />
           </div>
           <div style={{ textAlign: 'center' }}>
-            <p style={{ fontWeight: 600, fontSize: '1rem', color: '#fff', marginBottom: '0.25rem' }}>
-              {file ? file.name : 'Drag & drop your PDF or PowerPoint (.pptx) here, or click to browse'}
+            <p style={{ fontWeight: 600, fontSize: '0.92rem', color: '#fff', marginBottom: '0.2rem' }}>
+              {file ? file.name : 'Drag & drop PDF, PPTX, or Images here'}
             </p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-              Supports PDF documents and PPTX presentations up to 25MB
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              Supports PDF, PowerPoint, PNG, JPG & WEBP up to 25MB
             </p>
           </div>
         </div>
@@ -120,19 +128,20 @@ export default function FileUpload({ onUploadSuccess }) {
 
       {/* Selected file info & action button */}
       {file && (
-        <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-tertiary)', padding: '0.85rem 1.25rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <FileText size={20} color="#a5b4fc" />
+        <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-tertiary)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <FileText size={18} color="#a5b4fc" />
             <div>
-              <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#f3f4f6' }}>{file.name}</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#f3f4f6' }}>{file.name}</div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
                 {(file.size / (1024 * 1024)).toFixed(2)} MB
               </div>
             </div>
           </div>
 
           <button
-            className="btn"
+            className="btn btn-rocket-submit"
+            style={{ padding: '0.5rem 1rem', fontSize: '0.85rem' }}
             onClick={(e) => {
               e.stopPropagation();
               handleUpload();
@@ -141,11 +150,11 @@ export default function FileUpload({ onUploadSuccess }) {
           >
             {isUploading ? (
               <>
-                <Loader2 size={16} className="spin" /> Processing ({uploadProgress}%)...
+                <Loader2 size={15} className="spin" /> OCR & Indexing ({uploadProgress}%)...
               </>
             ) : (
               <>
-                <CheckCircle2 size={16} /> Extract Text & Metadata
+                <CheckCircle2 size={15} /> Run OCR & Index Document
               </>
             )}
           </button>
@@ -154,8 +163,8 @@ export default function FileUpload({ onUploadSuccess }) {
 
       {/* Error Message */}
       {uploadError && (
-        <div style={{ marginTop: '1rem', padding: '0.85rem 1.25rem', background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <AlertCircle size={20} />
+        <div style={{ marginTop: '0.85rem', padding: '0.75rem 1rem', background: 'var(--danger-bg)', border: '1px solid var(--danger)', borderRadius: 'var(--radius-sm)', color: '#fca5a5', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem' }}>
+          <AlertCircle size={18} />
           <div>
             <strong>Upload Error:</strong> {uploadError}
           </div>

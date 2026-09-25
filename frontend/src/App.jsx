@@ -70,7 +70,7 @@ export default function App() {
   return (
     <div className="hf-app-root">
       {/* Top Navbar */}
-      <Navbar 
+      <Navbar
         currentView={currentView}
         onNavigate={setCurrentView}
         health={health}
@@ -78,7 +78,7 @@ export default function App() {
       />
 
       {currentView === 'landing' ? (
-        <LandingPage 
+        <LandingPage
           onGetStarted={() => setCurrentView('workspace')}
           health={health}
         />
@@ -87,7 +87,7 @@ export default function App() {
           {/* Workspace Compact Subheader */}
           <div className="hf-workspace-header" style={{ marginBottom: '1rem', paddingBottom: '0.75rem' }}>
             <div className="hf-workspace-title-group">
-              <button 
+              <button
                 className="hf-back-btn"
                 onClick={() => setCurrentView('landing')}
               >
@@ -105,8 +105,8 @@ export default function App() {
                 {health?.target_model ? `${health.target_model} Ready` : 'Local AI Ready'}
               </div>
 
-              <button 
-                className="btn-icon" 
+              <button
+                className="btn-icon"
                 style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
                 onClick={fetchHealthAndDocs}
                 disabled={loadingHealth}
@@ -128,7 +128,7 @@ export default function App() {
 
           {/* 2-Column Dashboard Layout: Left = Upload & Docs, Right = AI Chatbot */}
           <div className="workspace-dashboard-grid">
-            
+
             {/* LEFT COLUMN: Upload PPT/PDF & Loaded Document Details */}
             <div className="workspace-left-panel">
               {/* PPT/PDF File Upload Card */}
