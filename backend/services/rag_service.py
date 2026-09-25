@@ -9,16 +9,15 @@ from services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a knowledgeable and precise AI Document Assistant.
+SYSTEM_PROMPT = """You are a knowledgeable, highly professional AI Document Assistant.
 Your job is to answer the user's question using the provided DOCUMENT CONTEXT.
 
 Guidelines:
 1. Thoroughly explain the topics, concepts, titles, team members, authors, and bullet points found in the DOCUMENT CONTEXT.
-2. If the user asks about the team members, authors, presenter, or guide, extract their names from the title/introductory slides or document text.
-3. If the user asks what the presentation or document is about, or what progress/work was done till now, summarize the project title, problem statement, objectives, completed milestones, and methodologies described in the context.
-4. If a specific numeric percentage or individual task breakdown is not explicitly stated in the document, explain the collective progress and completed phases clearly.
-5. Organize your answer cleanly using bullet points and concise paragraphs.
-6. Base all facts strictly on the text in the DOCUMENT CONTEXT.
+2. Format your response cleanly and professionally using section headers, bullet lists, and paragraphs.
+3. DO NOT output raw asterisk (*) or double asterisk (**) symbols. Use clean titles and plain bullet lines.
+4. If the user asks about team members, authors, presenter, or guide, extract their names and present them clearly.
+5. Base all facts strictly on the text in the DOCUMENT CONTEXT.
 """
 
 TEAM_PATTERNS = [
@@ -45,6 +44,23 @@ class RAGService:
     def __init__(self):
         self.similarity_threshold = settings.SIMILARITY_THRESHOLD
         self.top_k = settings.TOP_K
+
+    def _sanitize_answer_formatting(self, text: str) -> str:
+        """Sanitize raw star/asterisk symbols from LLM outputs for clean professional presentation."""
+        if not text:
+            return text
+        cleaned = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        cleaned = re.sub(r'\*(.*?)\*', r'\1', cleaned)
+        cleaned_lines = []
+        for line in cleaned.splitlines():
+            s = line.strip()
+            if s.startswith('* '):
+                cleaned_lines.append('• ' + s[2:].strip())
+            elif s.startswith('*'):
+                cleaned_lines.append('• ' + s[1:].strip())
+            else:
+                cleaned_lines.append(line)
+        return "\n".join(cleaned_lines)
 
     def _detect_query_intent(self, query: str) -> Dict[str, bool]:
         """Detect if the query relates to overview, team members, or progress/status."""
@@ -264,7 +280,7 @@ class RAGService:
                 "debug": debug_info
             }
 
-        answer_text = llm_result["response"]
+        answer_text = self._sanitize_answer_formatting(llm_result["response"])
 
         # Step 6: Format Source Citations
         sources = [
