@@ -9,15 +9,18 @@ from services.llm_service import llm_service
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a knowledgeable, highly professional AI Document Assistant.
-Your job is to answer the user's question using the provided DOCUMENT CONTEXT.
+SYSTEM_PROMPT = """You are an intelligent, highly professional AI Document Assistant (like ChatGPT).
+Your task is to answer the user's inquiry using the provided DOCUMENT CONTEXT.
 
-Guidelines:
-1. Thoroughly explain the topics, concepts, titles, team members, authors, and bullet points found in the DOCUMENT CONTEXT.
-2. Format your response cleanly and professionally using section headers, bullet lists, and paragraphs.
-3. DO NOT output raw asterisk (*) or double asterisk (**) symbols. Use clean titles and plain bullet lines.
-4. If the user asks about team members, authors, presenter, or guide, extract their names and present them clearly.
-5. Base all facts strictly on the text in the DOCUMENT CONTEXT.
+Formatting & Style Instructions:
+1. Present a beautiful, highly structured response using Markdown formatting:
+   - Use clear Section Headers (## 👥 Team & Authors, ## 📌 Project Overview, ## 🎓 Institution, ## 👨‍🏫 Supervisor / Guide, ## 💡 Key Information).
+   - Use relevant Emojis/Icons next to titles, section headers, and key entities.
+   - Use **bold text** for important names, labels, and titles.
+   - Use clean bullet lists (• or -) for multi-item lists.
+2. Output ONLY the polished, final user-facing response. Do NOT output any internal chain-of-thought notes, drafting steps, or self-correction commentary.
+3. If the user asks about team members, authors, presenters, or guides, present their names clearly in structured cards/lists.
+4. Base all factual information strictly on the text found in the DOCUMENT CONTEXT.
 """
 
 TEAM_PATTERNS = [
@@ -46,21 +49,26 @@ class RAGService:
         self.top_k = settings.TOP_K
 
     def _sanitize_answer_formatting(self, text: str) -> str:
-        """Sanitize raw star/asterisk symbols from LLM outputs for clean professional presentation."""
+        """Sanitize and format LLM output into clean ChatGPT-style Markdown with emojis and headers."""
         if not text:
             return text
-        cleaned = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-        cleaned = re.sub(r'\*(.*?)\*', r'\1', cleaned)
-        cleaned_lines = []
-        for line in cleaned.splitlines():
+        
+        # Remove any internal thinking or chain-of-thought drafting blocks if present
+        if "Drafting the final response" in text:
+            text = text.split("Drafting the final response")[-1]
+        if "Final Response:" in text:
+            text = text.split("Final Response:")[-1]
+        
+        # Clean up unwanted artifact lines (e.g. self-correction notes)
+        lines = []
+        for line in text.splitlines():
             s = line.strip()
-            if s.startswith('* '):
-                cleaned_lines.append('• ' + s[2:].strip())
-            elif s.startswith('*'):
-                cleaned_lines.append('• ' + s[1:].strip())
-            else:
-                cleaned_lines.append(line)
-        return "\n".join(cleaned_lines)
+            if s.startswith("Self-Correction") or s.startswith("Header:") or s.startswith("Sub-header:") or s.startswith("Section:"):
+                continue
+            lines.append(line)
+            
+        cleaned = "\n".join(lines).strip()
+        return cleaned
 
     def _detect_query_intent(self, query: str) -> Dict[str, bool]:
         """Detect if the query relates to overview, team members, or progress/status."""
@@ -169,7 +177,7 @@ class RAGService:
             document_id=document_id
         )
         search_time = time.time() - search_start
-
+        
         top_score = retrieved_chunks[0]["score"] if retrieved_chunks else 0.0
         intent = self._detect_query_intent(question)
         is_intent_matched = intent["is_team"] or intent["is_overview"] or intent["is_progress"]

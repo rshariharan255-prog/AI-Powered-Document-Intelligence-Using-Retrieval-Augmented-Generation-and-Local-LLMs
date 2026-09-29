@@ -210,7 +210,7 @@ export default function ChatWindow({ activeDocument }) {
               </span>
             </div>
             <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: 0 }}>
-              Powered by SentenceTransformers, FAISS & Gemma 2B (Local)
+              Powered by SentenceTransformers, FAISS & Google Gemini API
             </p>
           </div>
         </div>
@@ -246,7 +246,7 @@ export default function ChatWindow({ activeDocument }) {
                 {msg.role === 'assistant' && msg.id !== 'welcome' && !msg.id.startsWith('welcome-') && (
                   <div className="message-toolbar">
                     <span className="model-tag">
-                      <Rocket size={12} color="#38bdf8" /> Gemma 2B
+                      <Rocket size={12} color="#38bdf8" /> Gemini API
                     </span>
 
                     <button 

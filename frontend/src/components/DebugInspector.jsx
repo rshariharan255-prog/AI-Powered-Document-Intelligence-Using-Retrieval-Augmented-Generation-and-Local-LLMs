@@ -68,11 +68,11 @@ export default function DebugInspector({ debugData }) {
             </div>
           </div>
 
-          {/* Step 3: Gemma Generation */}
+          {/* Step 3: LLM Generation */}
           {debugData.timing_ms?.llm_generation && (
             <div className="debug-step">
               <div className="debug-step-title">
-                <span className="step-num">3</span> Local Generation via Ollama (Gemma 2B)
+                <span className="step-num">3</span> Generation via Gemini API
               </div>
               <div className="debug-step-content">
                 <div><strong>Inference Time:</strong> {debugData.timing_ms.llm_generation} ms</div>

@@ -26,6 +26,13 @@ app.include_router(upload_router)
 app.include_router(query_router)
 app.include_router(documents_router)
 
+@app.on_event("startup")
+def startup_event():
+    from services.embedding_service import embedding_service
+    logger.info("Pre-warming embedding model on startup...")
+    embedding_service._load_model()
+    logger.info("Server startup complete. System ready for instant queries!")
+
 # Enable CORS for React Vite Frontend (http://localhost:5173 by default)
 app.add_middleware(
     CORSMiddleware,

@@ -34,3 +34,18 @@ def ask_question(request: AskRequest):
             status_code=500,
             detail=f"Error executing RAG query: {str(e)}"
         )
+    '''Step 1: "What is machine learning?"
+             ↓
+    Step 2: Convert question into numbers (vector embedding)
+             ↓
+    Step 3: Search FAISS database → find PDF chunks that match
+             ↓
+    Step 4: Filter out weak matches (below similarity threshold)
+             ↓
+    Step 5: Take the best matching chunks + question
+             → Send to Gemma 2B AI model (via Ollama)
+             → AI reads the chunks and writes an answer
+             ↓
+    Step 6: Return the answer + which pages it came from
+
+    '''
